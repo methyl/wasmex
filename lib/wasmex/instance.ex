@@ -49,6 +49,16 @@ defmodule Wasmex.Instance do
     end
   end
 
+  @spec wasi_from_bytes(binary(), %{optional(binary()) => (... -> any())}, %{optional(:args) => [String.t()], optional(:env) => %{String.t() => String.t()}}) ::
+          {:error, binary()} | {:ok, __MODULE__.t()}
+  def wasi_from_bytes(bytes, imports, wasi) when is_binary(bytes) and is_map(imports) and is_map(wasi) do
+    
+    case Wasmex.Native.instance_new_from_bytes(bytes, imports, args, env) do
+      {:ok, resource} -> {:ok, wrap_resource(resource)}
+      {:error, err} -> {:error, err}
+    end
+  end
+
   defp wrap_resource(resource) do
     %__MODULE__{
       resource: resource,

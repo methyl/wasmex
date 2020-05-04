@@ -19,3 +19,4 @@ rustler = "0.21.0"
 lazy_static = "1.0"
 wasmer-runtime = { git = "https://github.com/wasmerio/wasmer", branch = "master" }
 wasmer-runtime-core = { git = "https://github.com/wasmerio/wasmer", branch = "master", features = ["dynamicfunc-fat-closures"] }
+wasmer-wasi = { git = "https://github.com/wasmerio/wasmer", branch = "master" }

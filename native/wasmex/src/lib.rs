@@ -15,6 +15,7 @@ rustler::rustler_export_nifs! {
     "Elixir.Wasmex.Native",
     [
         ("instance_new_from_bytes", 2, instance::new_from_bytes),
+        ("instance_new_wasi_from_bytes", 4, instance::new_wasi_from_bytes),
         ("instance_function_export_exists", 2, instance::function_export_exists),
         ("instance_call_exported_function", 4, instance::call_exported_function),
         ("namespace_receive_callback_result", 3, namespace::receive_callback_result),

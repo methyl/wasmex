@@ -27,9 +27,10 @@ defmodule Wasmex do
 
   # Client
 
+  
   @doc """
   Starts a GenServer which compiles and instantiates a WASM module from the given bytes and imports map.
-
+  
   ```elixir
   imports = %{
     env: %{
@@ -38,46 +39,53 @@ defmodule Wasmex do
   }
   {:ok, bytes } = File.read("wasmex_test.wasm")
   {:ok, instance } = Wasmex.start_link.from_bytes(%{bytes: bytes, imports: imports})
-
+  
   {:ok, [42]} == Wasmex.call_function(instance, "sum", [50, -8])
   ```
-
+  
   The imports are given as a map of namespaces.
   In the example above, we import the `"env"` namespace.
   Each namespace is, again, a map listing imports.
   Under the name `add_ints`, we imported a function which is represented with a tuple of:
-
+  
   1. the import type: `:fn` (a function),
   1. the functions parameter types: `[:i32, :i32]`,
   1. the functions return types: `[:i32]`, and
   1. a function reference: `fn (_context, a, b, c) -> a + b end`
-
+  
   When the WASM code executes the `add_ints` imported function, the execution context is forwarded to
   the given function reference.
   The first param is always the call context (a Map containing e.g. the instances memory).
   All other params are regular parameters as specified by the parameter type list.
-
+  
   Valid parameter/return types are:
-
+  
   - `:i32` a 32 bit integer
   - `:i64` a 64 bit integer
   - `:f32` a 32 bit float
   - `:f64` a 64 bit float
-
+  
   The return type must always be one value. (There are preparations to enable WASM to return multiple
   values from a function call. We prepared the API for this future by specifying an array of return types.)
   """
-  def start_link(%{bytes: bytes, imports: imports}) when is_binary(bytes) do
-    GenServer.start_link(__MODULE__, %{bytes: bytes, imports: stringify_keys(imports)})
+  def start_link(%{bytes: bytes, imports: imports, wasi: wasi}) when is_binary(bytes) and is_map(imports) and is_map(wasi) do
+    GenServer.start_link(__MODULE__, %{bytes: bytes, imports: stringify_keys(imports), wasi: stringify_keys(wasi)})
   end
-
+  
+  @doc """
+  TBD
+  """
+  def start_link(%{bytes: bytes, imports: imports}) when is_binary(bytes) do
+    GenServer.start_link(__MODULE__, %{bytes: bytes, imports: stringify_keys(imports), wasi: %{}})
+  end
+  
   @doc """
   Starts a GenServer which compiles and instantiates a WASM module from the given bytes.
   """
   def start_link(bytes) when is_binary(bytes) do
-    start_link(%{bytes: bytes, imports: %{}})
+    start_link(%{bytes: bytes, imports: %{}, wasi: %{}})
   end
-
+  
   @doc """
   Returns whether a function export with the given `name` exists in the WebAssembly instance.
   """
@@ -133,9 +141,15 @@ defmodule Wasmex do
                    }
   """
   @impl true
-  def init(%{bytes: bytes, imports: imports}) when is_binary(bytes) do
+  def init(%{bytes: bytes, imports: imports, wasi: wasi}) when is_binary(bytes) and is_map(imports) and is_map(wasi) and map_size(wasi) == 0 do
     {:ok, instance} = Wasmex.Instance.from_bytes(bytes, imports)
-    {:ok, %{instance: instance, imports: imports}}
+    {:ok, %{instance: instance, imports: imports, wasi: wasi}}
+  end
+
+  @impl true
+  def init(%{bytes: bytes, imports: imports, wasi: wasi}) when is_binary(bytes) and is_map(imports) and is_map(wasi) and map_size(wasi) <= 2 do
+    {:ok, instance} = Wasmex.Instance.from_bytes(bytes, imports)
+    {:ok, %{instance: instance, imports: imports, wasi: wasi}}
   end
 
   @impl true

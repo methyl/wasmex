@@ -4,12 +4,14 @@ use rustler::{
     resource::ResourceArc,
     types::binary::Binary,
     types::tuple::make_tuple,
+    types::ListIterator,
     {Encoder, Env, Error, MapIterator, Term},
 };
 use std::sync::Mutex;
 use std::thread;
-use wasmer_runtime::{self as runtime, imports};
+use wasmer_runtime::{self as runtime, imports, ImportObject};
 use wasmer_runtime_core::{import::Namespace, types::Type};
+use wasmer_wasi::generate_import_object;
 
 use crate::{atoms, functions, namespace, printable_term_type::PrintableTermType};
 
@@ -22,14 +24,48 @@ pub struct InstanceResource {
 //
 // * bytes (binary): the bytes of the WASM module
 // * imports (map): a map defining eventual instance imports, may be empty if there are none.
-//   structure: %{namespace_name: %{import_name: {TODO: signature}}}
+//   structure: %{namespace_name: %{import_name: {:fn, param_types, result_types, captured_function}}}
 pub fn new_from_bytes<'a>(env: Env<'a>, args: &[Term<'a>]) -> Result<Term<'a>, Error> {
     let binary: Binary = args[0].decode()?;
     let imports: MapIterator = args[1].decode()?;
     let bytes = binary.as_slice();
 
     let mut import_object = imports! {};
-    for (name, namespace_definition) in imports {
+    create_instance_resource(&mut import_object, imports, bytes, env)
+}
+
+// creates a new instance from the given WASM bytes
+// expects the following elixir params
+//
+// * bytes (binary): the bytes of the WASM module
+// * imports (map): a map defining eventual instance imports, may be empty if there are none.
+//   structure: %{namespace_name: %{import_name: {:fn, param_types, result_types, captured_function}}}
+// * wasi_args (list of Strings): a list of argument strings
+// * wasi_env: (list of Strings): a list of environment variable definitions, each of the type "NAME=value"
+pub fn new_wasi_from_bytes<'a>(env: Env<'a>, args: &[Term<'a>]) -> Result<Term<'a>, Error> {
+    let binary: Binary = args[0].decode()?;
+    let imports: MapIterator = args[1].decode()?;
+    let wasi_args = args[2]
+        .decode::<ListIterator>()?
+        .map(|term: Term| term.decode::<String>().map(|s| s.into_bytes()))
+        .collect::<Result<Vec<Vec<u8>>, _>>()?;
+    let wasi_env = args[3]
+        .decode::<ListIterator>()?
+        .map(|term: Term| term.decode::<String>().map(|s| s.into_bytes()))
+        .collect::<Result<Vec<Vec<u8>>, _>>()?;
+    let bytes = binary.as_slice();
+
+    let mut import_object = generate_import_object(wasi_args, wasi_env, vec![], vec![]);
+    create_instance_resource(&mut import_object, imports, bytes, env)
+}
+
+fn create_instance_resource<'a>(
+    import_object: &mut ImportObject,
+    import_overwrites: MapIterator,
+    bytes: &[u8],
+    env: Env<'a>,
+) -> Result<Term<'a>, Error> {
+    for (name, namespace_definition) in import_overwrites {
         let name = name.decode::<String>()?;
         let namespace: Namespace = namespace::create_from_definition(&name, namespace_definition)?;
         import_object.register(name, namespace);
