@@ -30,8 +30,8 @@ pub fn new_from_bytes<'a>(env: Env<'a>, args: &[Term<'a>]) -> Result<Term<'a>, E
     let imports: MapIterator = args[1].decode()?;
     let bytes = binary.as_slice();
 
-    let mut import_object = imports! {};
-    create_instance_resource(&mut import_object, imports, bytes, env)
+    let mut import_object = import_object_from_definition(imports)?;
+    create_instance_resource(&mut import_object, bytes, env)
 }
 
 // creates a new instance from the given WASM bytes
@@ -55,21 +55,30 @@ pub fn new_wasi_from_bytes<'a>(env: Env<'a>, args: &[Term<'a>]) -> Result<Term<'
         .collect::<Result<Vec<Vec<u8>>, _>>()?;
     let bytes = binary.as_slice();
 
+    // creates as WASI import object and merges imports from elixir into them
+    // this allows overwriting certain WASI functions from elixir
     let mut import_object = generate_import_object(wasi_args, wasi_env, vec![], vec![]);
-    create_instance_resource(&mut import_object, imports, bytes, env)
+    let import_object_overwrites = import_object_from_definition(imports)?;
+    import_object.extend(import_object_overwrites);
+
+    create_instance_resource(&mut import_object, bytes, env)
+}
+
+fn import_object_from_definition(imports_definition: MapIterator) -> Result<ImportObject, Error> {
+    let mut import_object = imports! {};
+    for (name, namespace_definition) in imports_definition {
+        let name = name.decode::<String>()?;
+        let namespace: Namespace = namespace::from_definition(&name, namespace_definition)?;
+        import_object.register(name, namespace);
+    }
+    Ok(import_object)
 }
 
 fn create_instance_resource<'a>(
     import_object: &mut ImportObject,
-    import_overwrites: MapIterator,
     bytes: &[u8],
     env: Env<'a>,
 ) -> Result<Term<'a>, Error> {
-    for (name, namespace_definition) in import_overwrites {
-        let name = name.decode::<String>()?;
-        let namespace: Namespace = namespace::create_from_definition(&name, namespace_definition)?;
-        import_object.register(name, namespace);
-    }
     let instance = match runtime::instantiate(bytes, &import_object) {
         Ok(instance) => instance,
         Err(e) => return Ok((atoms::error(), format!("Cannot Instantiate: {:?}", e)).encode(env)),

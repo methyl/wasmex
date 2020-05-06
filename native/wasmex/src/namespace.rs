@@ -22,7 +22,7 @@ pub struct CallbackToken {
     pub return_values: Mutex<Option<(bool, Vec<runtime::Value>)>>,
 }
 
-pub fn create_from_definition(namespace_name: &str, definition: Term) -> Result<Namespace, Error> {
+pub fn from_definition(namespace_name: &str, definition: Term) -> Result<Namespace, Error> {
     let mut namespace = Namespace::new();
     let definition: MapIterator = definition.decode()?;
     for (name, import) in definition {

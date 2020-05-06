@@ -4,6 +4,7 @@ defmodule WasmexTest do
 
   @bytes File.read!(TestHelper.wasm_test_file_path())
   @import_test_bytes File.read!(TestHelper.wasm_import_test_file_path())
+  @wasi_test_bytes  File.read!(TestHelper.wasi_test_file_path())
 
   defp create_instance(_context) do
     instance = start_supervised!({Wasmex, @bytes})
@@ -216,5 +217,44 @@ defmodule WasmexTest do
       assert {:error, reason} = Wasmex.call_function(instance, "using_imported_sum3", [1, 2, 3])
       assert reason =~ "error: \"the elixir callback threw an exception\""
     end
+  end
+
+  test "runnung a WASM/WASI module" do
+    imports = %{
+      # wasi_snapshot_preview1: %{
+      #   # Params:
+      #   # fd: __wasi_fd_t,
+      #   # iovs: WasmPtr<__wasi_ciovec_t, Array>,
+      #   # iovs_len: u32,
+      #   # nwritten: WasmPtr<u32>,
+      #   #
+      #   # Returns:
+      #   # __wasi_errno_t
+      #   #
+      #   # See: https://github.com/WebAssembly/WASI/blob/d6eec8647fa819f5d44ac8e7e0d8a3205deedccb/phases/snapshot/docs.md#-fd_writefd-fd-iovs-ciovec_array---errno-size
+      #   fd_write:
+      #     {:fn, [:i32, :i32, :i32, :i32], [:i32],
+      #      fn context, fd, iovs, iovs_len, nwritten ->
+      #        memory = Map.get(context, :memory)
+      #        IO.puts({:fd, fd})
+      #        IO.puts({:iovs, iovs})
+      #        IO.puts({:iovs_len, iovs_len})
+      #        IO.puts({:nwritten, nwritten})
+      #        Wasmex.Memory.set(memory, :uint8, 0, nwritten, 23)
+      #        0
+      #      end},
+      # }
+    }
+
+    wasi = %{
+      args: ["hello", "from elixir"],
+      env: %{
+        "A_NAME_MAPS" => "TO_A_VALUE",
+        "THE_TEST_WASI_FILE" => "PRINTS_ALL_ENVS"
+      }
+    }
+
+    instance = start_supervised!({Wasmex, %{bytes: @wasi_test_bytes, imports: imports, wasi: wasi}})
+    {:ok, _} = Wasmex.call_function(instance, :_start, [])
   end
 end

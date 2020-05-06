@@ -1,0 +1,11 @@
+[package]
+name = "wasi_test"
+version = "0.1.0"
+authors = ["Philipp Tessenow <philipp@tessenow.org>"]
+edition = "2018"
+
+[dependencies]
+
+[[bin]]
+path = "src/main.rs"
+name = "main"
