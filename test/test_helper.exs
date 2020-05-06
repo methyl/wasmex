@@ -9,7 +9,7 @@ defmodule TestHelper do
   def wasm_import_test_file_path,
     do: "#{@wasm_import_test_source_dir}/target/wasm32-unknown-unknown/debug/wasmex_test.wasm"
 
-    def wasi_test_file_path,
+  def wasi_test_file_path,
     do: "#{@wasi_test_source_dir}/target/wasm32-wasi/debug/main.wasm"
 
   def compile_wasm_files do
