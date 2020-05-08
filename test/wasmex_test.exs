@@ -220,32 +220,66 @@ defmodule WasmexTest do
   end
 
   test "runnung a WASM/WASI module" do
-    imports =
-      %{
-        # wasi_snapshot_preview1: %{
-        #   # Params:
-        #   # fd: __wasi_fd_t,
-        #   # iovs: WasmPtr<__wasi_ciovec_t, Array>,
-        #   # iovs_len: u32,
-        #   # nwritten: WasmPtr<u32>,
-        #   #
-        #   # Returns:
-        #   # __wasi_errno_t
-        #   #
-        #   # See: https://github.com/WebAssembly/WASI/blob/d6eec8647fa819f5d44ac8e7e0d8a3205deedccb/phases/snapshot/docs.md#-fd_writefd-fd-iovs-ciovec_array---errno-size
-        #   fd_write:
-        #     {:fn, [:i32, :i32, :i32, :i32], [:i32],
-        #      fn context, fd, iovs, iovs_len, nwritten ->
-        #        memory = Map.get(context, :memory)
-        #        IO.puts({:fd, fd})
-        #        IO.puts({:iovs, iovs})
-        #        IO.puts({:iovs_len, iovs_len})
-        #        IO.puts({:nwritten, nwritten})
-        #        Wasmex.Memory.set(memory, :uint8, 0, nwritten, 23)
-        #        0
-        #      end},
-        # }
+    imports = %{
+      wasi_snapshot_preview1: %{
+        proc_exit:
+          {:fn, [:i32], [],
+           fn _rval ->
+             0
+           end},
+        # "args_get"
+        # "args_sizes_get"
+        # "fd_prestat_get"
+        # "fd_prestat_dir_name"
+        # environ_sizes_get:
+        #   {:fn, [:i32, :i32], [:i32],
+        #    fn environCountPtr, environBufferSizePtr ->
+        #      42
+        #    end},
+        # "environ_get"
+        # clock_time_get: {:fn, [:i32, :i64, :i32], [:i32], fn context, clock_id, precision, time_ptr ->
+        #   0
+        # end}
+        random_get:
+          {:fn, [:i32, :i32], [:i32],
+           fn %{memory: memory}, address, size ->
+             bytes = :crypto.strong_rand_bytes(size)
+
+             bytes
+             |> :binary.bin_to_list()
+             |> Enum.with_index()
+             |> Enum.each(fn {byte, index} ->
+               IO.puts("setting #{byte} at #{address + index}")
+               Wasmex.Memory.set(memory, address + index, byte)
+             end)
+
+             0
+           end}
+        #
+        #
+        # Params:
+        # fd: __wasi_fd_t,
+        # iovs: WasmPtr<__wasi_ciovec_t, Array>,
+        # iovs_len: u32,
+        # nwritten: WasmPtr<u32>,
+        #
+        # Returns:
+        # __wasi_errno_t
+        #
+        # See: https://github.com/WebAssembly/WASI/blob/d6eec8647fa819f5d44ac8e7e0d8a3205deedccb/phases/snapshot/docs.md#-fd_writefd-fd-iovs-ciovec_array---errno-size
+        # fd_write:
+        #   {:fn, [:i32, :i32, :i32, :i32], [:i32],
+        #    fn context, fd, iovs, iovs_len, nwritten ->
+        #     #  memory = Map.get(context, :memory)
+        #     #  IO.puts({:fd, fd})
+        #     #  IO.puts({:iovs, iovs})
+        #     #  IO.puts({:iovs_len, iovs_len})
+        #     #  IO.puts({:nwritten, nwritten})
+        #     #  Wasmex.Memory.set(memory, :uint8, 0, nwritten, 23)
+        #      0
+        #    end},
       }
+    }
 
     wasi = %{
       args: ["hello", "from elixir"],

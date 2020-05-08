@@ -1,6 +1,9 @@
 use std::env;
 use std::time::{SystemTime, UNIX_EPOCH};
 
+use rand_core::RngCore;
+use wasi_rng::WasiRng;
+
 fn main() {
     println!("Hello from the WASI test program!");
     println!();
@@ -23,4 +26,9 @@ fn main() {
         .expect("Time went backwards!")
         .as_secs();
     println!("{}", seconds_since_epoch);
+    println!();
+
+    let mut rng = WasiRng;
+    println!("Random Number: {}", rng.next_u32());
+    println!();
 }
